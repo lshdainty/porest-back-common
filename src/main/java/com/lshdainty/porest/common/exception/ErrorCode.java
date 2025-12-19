@@ -139,6 +139,7 @@ public enum ErrorCode {
     // AUTH (인증)
     // ========================================
     UNSUPPORTED_OAUTH_PROVIDER("AUTH_001", "error.auth.unsupported.provider", HttpStatus.BAD_REQUEST),
+    OAUTH_PROVIDER_NOT_LINKED("AUTH_002", "error.oauth.provider.not.linked", HttpStatus.NOT_FOUND),
 
     // ========================================
     // NOTICE (공지사항)
