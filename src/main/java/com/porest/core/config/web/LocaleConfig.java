@@ -11,7 +11,34 @@ import java.util.Locale;
 
 /**
  * 다국어 지원을 위한 Locale 설정
- * Accept-Language 헤더 기반으로 Locale을 결정하며, lang 파라미터로 변경 가능
+ * <p>
+ * Accept-Language 헤더 기반으로 Locale을 결정하며, URL 파라미터로 변경할 수 있습니다.
+ *
+ * <h3>Locale 결정 우선순위</h3>
+ * <ol>
+ *   <li>URL 파라미터 {@code lang} (예: {@code ?lang=en})</li>
+ *   <li>HTTP Accept-Language 헤더</li>
+ *   <li>기본값: 한국어 (ko)</li>
+ * </ol>
+ *
+ * <h3>지원 언어</h3>
+ * <ul>
+ *   <li>한국어 (ko) - 기본</li>
+ *   <li>영어 (en)</li>
+ * </ul>
+ *
+ * <h3>사용 예시</h3>
+ * <pre>{@code
+ * // URL 파라미터로 언어 변경
+ * GET /api/v1/users?lang=en
+ *
+ * // Accept-Language 헤더로 언어 설정
+ * Accept-Language: ko-KR,ko;q=0.9,en;q=0.8
+ * }</pre>
+ *
+ * @author porest
+ * @see LocaleResolver
+ * @see LocaleChangeInterceptor
  */
 @Configuration
 public class LocaleConfig {

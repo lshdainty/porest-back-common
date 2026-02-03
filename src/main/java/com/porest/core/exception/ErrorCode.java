@@ -5,9 +5,35 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
 /**
- * Core 공통 에러 코드 정의
- * 도메인 특화 에러 코드는 각 프로젝트의 HrErrorCode 등에서 정의
- * 실제 메시지는 messages.properties에서 다국어로 관리
+ * Core 공통 에러 코드
+ * <p>
+ * 프로젝트 전반에서 사용되는 공통 에러 코드를 정의합니다.
+ * 도메인 특화 에러 코드는 각 모듈의 ErrorCode enum에서 별도로 정의합니다.
+ *
+ * <h3>에러 코드 구조</h3>
+ * <ul>
+ *   <li><b>COMMON_xxx</b>: 공통 에러 (인증, 권한, 유효성 검증 등)</li>
+ *   <li><b>FILE_xxx</b>: 파일 관련 에러</li>
+ * </ul>
+ *
+ * <h3>메시지 처리</h3>
+ * <p>
+ * 실제 에러 메시지는 {@code messages.properties}에서 다국어로 관리됩니다.
+ * {@code messageKey} 필드가 메시지 파일의 키와 매핑됩니다.
+ *
+ * <h3>사용 예시</h3>
+ * <pre>{@code
+ * // 예외 발생
+ * throw new InvalidValueException(ErrorCode.INVALID_INPUT);
+ * throw new UnauthorizedException(ErrorCode.UNAUTHORIZED);
+ *
+ * // 메시지 조회
+ * String message = messageResolver.getMessage(ErrorCode.NOT_FOUND);
+ * }</pre>
+ *
+ * @author porest
+ * @see ErrorCodeProvider
+ * @see BusinessException
  */
 @Getter
 @RequiredArgsConstructor
