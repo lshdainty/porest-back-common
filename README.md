@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/POREST_Common-6DB33F?style=for-the-badge&logo=spring&logoColor=white" alt="POREST Common" />
+  <img src="https://img.shields.io/badge/POREST_Core-6DB33F?style=for-the-badge&logo=spring&logoColor=white" alt="POREST Core" />
 </p>
 
 <h1 align="center">POREST Core</h1>
@@ -20,11 +20,17 @@
 
 **porest-core**는 [POREST](https://github.com/lshdainty/POREST) 백엔드 프로젝트에서 공통으로 사용되는 라이브러리입니다.
 
-예외 처리, 국제화(i18n), API 응답 포맷, 공통 설정 등 프로젝트 전반에서 사용되는 컴포넌트를 제공합니다.
+예외 처리, 국제화(i18n), API 응답 포맷, JPA Auditing, 공통 설정 등 프로젝트 전반에서 사용되는 컴포넌트를 제공합니다.
 
 ---
 
 ## 주요 기능
+
+### Domain
+
+| 클래스 | 설명 |
+|--------|------|
+| `AuditingFields` | JPA Auditing 기본 필드 (createAt, createBy, modifyAt, modifyBy) |
 
 ### Configuration
 
@@ -33,6 +39,7 @@
 | `config.web` | Locale 설정 |
 | `config.openapi` | Swagger/OpenAPI 설정 |
 | `config.properties` | Security Properties |
+| `PasswordEncoderConfig` | BCrypt 비밀번호 인코더 |
 
 ### Controller
 
@@ -40,18 +47,21 @@
 |--------|------|
 | `ApiResponse` | 통일된 API 응답 포맷 |
 | `GlobalExceptionHandler` | 전역 예외 처리 |
-| `TypesApi` | 공통 타입 조회 API |
+| `PageRequest` / `CursorRequest` | 페이지네이션 요청 DTO |
 
 ### Exception
 
-| 클래스 | 설명 |
-|--------|------|
-| `BusinessException` | 비즈니스 예외 기본 클래스 |
-| `EntityNotFoundException` | 엔티티 조회 실패 |
-| `InvalidValueException` | 입력값 검증 실패 |
-| `DuplicateException` | 중복 데이터 |
-| `ForbiddenException` | 권한 없음 |
-| `UnauthorizedException` | 인증 실패 |
+| 클래스 | HTTP Status | 설명 |
+|--------|-------------|------|
+| `BusinessException` | - | 비즈니스 예외 기본 클래스 |
+| `EntityNotFoundException` | 404 | 엔티티 조회 실패 |
+| `ResourceNotFoundException` | 404 | 리소스 조회 실패 |
+| `InvalidValueException` | 400 | 입력값 검증 실패 |
+| `BusinessRuleViolationException` | 400 | 비즈니스 규칙 위반 |
+| `DuplicateException` | 409 | 중복 데이터 |
+| `UnauthorizedException` | 401 | 인증 실패 |
+| `ForbiddenException` | 403 | 권한 없음 |
+| `ExternalServiceException` | 5xx | 외부 서비스 연동 실패 |
 
 ### Type (Interface & Enum)
 
@@ -68,8 +78,25 @@
 | 클래스 | 설명 |
 |--------|------|
 | `MessageResolver` | 다국어 메시지 조회 |
-| `PorestTime` | 날짜/시간 유틸리티 |
-| `PorestFile` | 파일 처리 유틸리티 |
+| `TimeUtils` | 날짜/시간 유틸리티 |
+| `FileUtils` | 파일 처리 (저장, 읽기, 해시 계산 등) |
+| `HttpUtils` | HTTP 요청 유틸리티 (IP, 헤더, 파라미터 등) |
+| `CryptoUtils` | 암호화 유틸리티 |
+| `JsonUtils` | JSON 변환 유틸리티 |
+| `MaskUtils` | 마스킹 유틸리티 |
+| `RegexPatterns` | 정규식 패턴 |
+
+### Security
+
+| 클래스 | 설명 |
+|--------|------|
+| `AuditorPrincipal` | JPA Auditing용 Principal 인터페이스 |
+
+### Message
+
+| 클래스 | 설명 |
+|--------|------|
+| `MessageKey` | 다국어 메시지 키 enum |
 
 ---
 
@@ -78,33 +105,111 @@
 ```
 src/main/java/com/porest/core/
 ├── config/
-│   ├── web/             # Locale 설정
-│   ├── openapi/         # Swagger 설정
-│   └── properties/      # Security Properties
-├── constant/            # 상수 정의
+│   ├── web/                 # Locale 설정
+│   ├── openapi/             # Swagger 설정
+│   ├── properties/          # Security Properties
+│   └── PasswordEncoderConfig.java
+├── constant/                # 상수 정의
 ├── controller/
+│   ├── dto/                 # PageRequest, CursorRequest
 │   ├── ApiResponse.java
-│   ├── GlobalExceptionHandler.java
-│   └── TypesApi.java
-├── exception/           # 예외 클래스
+│   └── GlobalExceptionHandler.java
+├── domain/
+│   └── AuditingFields.java  # JPA Auditing 기본 필드
+├── exception/
+│   ├── ErrorCode.java
+│   ├── ErrorCodeProvider.java
 │   ├── BusinessException.java
-│   ├── EntityNotFoundException.java
-│   ├── InvalidValueException.java
 │   └── ...
-├── logging/             # 로깅 유틸리티
-├── message/             # 메시지 리소스
-├── security/            # 보안 관련
+├── logging/                 # 로깅 AOP
+├── message/
+│   └── MessageKey.java
+├── security/
+│   └── AuditorPrincipal.java
 ├── type/
-│   ├── CompanyType.java      # Interface
-│   ├── SystemType.java       # Interface
-│   ├── DisplayType.java      # Interface
+│   ├── CompanyType.java
+│   ├── SystemType.java
+│   ├── DisplayType.java
 │   ├── CountryCode.java
 │   └── YNType.java
-├── util/                # 유틸리티
+├── util/
 │   ├── MessageResolver.java
-│   ├── PorestTime.java
-│   └── PorestFile.java
-└── validation/          # 검증 유틸리티
+│   ├── TimeUtils.java
+│   ├── FileUtils.java
+│   ├── HttpUtils.java
+│   ├── CryptoUtils.java
+│   ├── JsonUtils.java
+│   ├── MaskUtils.java
+│   └── RegexPatterns.java
+└── validation/              # 검증 유틸리티
+```
+
+---
+
+## 사용 예시
+
+### AuditingFields
+
+```java
+// 기본 사용
+@Entity
+@Table(name = "users")
+public class User extends AuditingFields {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+    private String email;
+}
+
+// IP 필드 확장 (각 서비스에서)
+@MappedSuperclass
+public abstract class AuditingFieldsWithIp extends AuditingFields {
+    @Column(name = "create_ip", length = 45)
+    private String createIp;
+
+    @Column(name = "modify_ip", length = 45)
+    private String modifyIp;
+
+    @PrePersist
+    public void prePersist() {
+        this.createIp = HttpUtils.getClientIp();
+        this.modifyIp = this.createIp;
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.modifyIp = HttpUtils.getClientIp();
+    }
+}
+```
+
+### Exception
+
+```java
+// 엔티티 조회 실패
+User user = userRepository.findById(id)
+    .orElseThrow(() -> new EntityNotFoundException(ErrorCode.NOT_FOUND));
+
+// 비즈니스 규칙 위반
+if (vacation.getBalance() < requestedDays) {
+    throw new BusinessRuleViolationException(HrErrorCode.VACATION_INSUFFICIENT);
+}
+```
+
+### Utility
+
+```java
+// 파일 해시 계산
+String hash = FileUtils.calculateSha256("/files/document.pdf");
+
+// HTTP 요청 정보
+String clientIp = HttpUtils.getClientIp();
+Map<String, String> params = HttpUtils.getParameterMapSingleValue();
+
+// 다국어 메시지
+String message = messageResolver.getMessage(MessageKey.COMMON_SUCCESS);
 ```
 
 ---
@@ -145,5 +250,5 @@ dependencies {
 ---
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/lshdainty">lshdainty</a>
+  Made with by <a href="https://github.com/lshdainty">lshdainty</a>
 </p>
