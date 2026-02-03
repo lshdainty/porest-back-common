@@ -12,6 +12,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *
  * <h3>주요 기능</h3>
  * <ul>
+ *   <li>클라이언트 IP 주소 추출 (프록시/로드밸런서 지원)</li>
  *   <li>User-Agent 추출</li>
  *   <li>Referer 추출</li>
  *   <li>AJAX 요청 여부 확인</li>
@@ -22,6 +23,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *
  * <h3>사용 예시</h3>
  * <pre>{@code
+ * // 클라이언트 IP 조회
+ * String clientIp = HttpUtils.getClientIp();
+ * log.info("접속 IP: {}", clientIp);
+ *
  * // User-Agent 확인
  * String userAgent = HttpUtils.getUserAgent();
  * if (userAgent != null && userAgent.contains("Mobile")) {
@@ -41,15 +46,26 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * String authHeader = HttpUtils.getHeader("Authorization");
  * }</pre>
  *
+ * <h3>IP 추출 시 프록시 헤더 확인 순서</h3>
+ * <ol>
+ *   <li>X-Forwarded-For</li>
+ *   <li>Proxy-Client-IP</li>
+ *   <li>WL-Proxy-Client-IP (WebLogic)</li>
+ *   <li>HTTP_CLIENT_IP</li>
+ *   <li>HTTP_X_FORWARDED_FOR</li>
+ *   <li>request.getRemoteAddr() (기본)</li>
+ * </ol>
+ *
  * <h3>참고사항</h3>
  * <ul>
  *   <li>웹 요청 컨텍스트가 없는 경우 null을 반환합니다.</li>
  *   <li>배치 작업이나 비동기 스레드에서는 요청 정보를 가져올 수 없습니다.</li>
- *   <li>IP 주소 추출은 {@link PorestIP}를 사용하세요.</li>
+ *   <li>X-Forwarded-For에 여러 IP가 있는 경우 첫 번째 IP를 반환합니다.</li>
  * </ul>
  *
  * @author porest
- * @see PorestIP
+ * @see HttpServletRequest
+ * @see RequestContextHolder
  */
 public final class HttpUtils {
 
@@ -66,6 +82,100 @@ public final class HttpUtils {
         ServletRequestAttributes attributes =
                 (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         return attributes != null ? attributes.getRequest() : null;
+    }
+
+    // ========================================
+    // IP 주소
+    // ========================================
+
+    /**
+     * 현재 HTTP 요청의 클라이언트 IP 주소 조회
+     * <p>
+     * 프록시나 로드 밸런서를 통한 요청의 경우에도
+     * 실제 클라이언트의 IP 주소를 정확하게 추출합니다.
+     *
+     * <h4>반환 예시</h4>
+     * <ul>
+     *   <li>일반 접속: "203.0.113.50"</li>
+     *   <li>프록시 경유: "203.0.113.50" (X-Forwarded-For에서 추출)</li>
+     *   <li>localhost: "127.0.0.1" 또는 "0:0:0:0:0:0:0:1"</li>
+     *   <li>요청 없음: null</li>
+     * </ul>
+     *
+     * <h4>사용 예시</h4>
+     * <pre>{@code
+     * String clientIp = HttpUtils.getClientIp();
+     * log.info("사용자 접속 IP: {}", clientIp);
+     *
+     * // IP 기반 접근 제어
+     * if (clientIp != null && clientIp.startsWith("192.168.")) {
+     *     // 내부 네트워크 접속
+     * }
+     * }</pre>
+     *
+     * @return 클라이언트 IP 주소, HTTP 요청 컨텍스트가 없으면 null
+     */
+    public static String getClientIp() {
+        HttpServletRequest request = getCurrentRequest();
+        return getClientIp(request);
+    }
+
+    /**
+     * HttpServletRequest에서 클라이언트 IP 주소 조회
+     * <p>
+     * 프록시 관련 헤더들을 순서대로 확인하여 실제 클라이언트 IP를 추출합니다.
+     *
+     * <h4>사용 예시</h4>
+     * <pre>{@code
+     * @GetMapping("/api/info")
+     * public String getInfo(HttpServletRequest request) {
+     *     String ip = HttpUtils.getClientIp(request);
+     *     return "Your IP: " + ip;
+     * }
+     * }</pre>
+     *
+     * @param request HTTP 요청 객체
+     * @return 클라이언트 IP 주소, request가 null이면 null
+     */
+    public static String getClientIp(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+
+        String ip = request.getHeader("X-Forwarded-For");
+
+        if (isInvalidIp(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (isInvalidIp(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (isInvalidIp(ip)) {
+            ip = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (isInvalidIp(ip)) {
+            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (isInvalidIp(ip)) {
+            ip = request.getRemoteAddr();
+        }
+
+        // X-Forwarded-For 헤더에 여러 IP가 있을 수 있으므로 첫 번째 IP를 사용
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+
+        return ip;
+    }
+
+    /**
+     * IP 주소가 유효하지 않은지 확인
+     *
+     * @param ip 검사할 IP 주소
+     * @return 유효하지 않으면 true
+     */
+    private static boolean isInvalidIp(String ip) {
+        return ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip);
     }
 
     // ========================================

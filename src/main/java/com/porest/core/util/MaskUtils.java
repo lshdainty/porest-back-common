@@ -4,35 +4,59 @@ package com.porest.core.util;
  * 문자열 마스킹 유틸리티
  * <p>
  * 개인정보 보호를 위해 민감한 정보를 마스킹 처리합니다.
- * 로깅, API 응답, 화면 표시 등에서 사용합니다.
+ * 로깅, API 응답, 화면 표시 등에서 개인정보 노출을 방지합니다.
  *
  * <h3>사용 예시</h3>
  * <pre>{@code
  * // 이메일 마스킹
- * String masked = PorestMask.email("hong@example.com");
+ * String masked = MaskUtils.email("hong@example.com");
  * // 결과: "hon***@example.com"
  *
  * // 전화번호 마스킹
- * String masked = PorestMask.phone("010-1234-5678");
+ * String masked = MaskUtils.phone("010-1234-5678");
  * // 결과: "010-****-5678"
  *
  * // 이름 마스킹
- * String masked = PorestMask.name("홍길동");
+ * String masked = MaskUtils.name("홍길동");
  * // 결과: "홍*동"
  *
- * // 로깅 시 사용
- * log.info("사용자 정보 - 이름: {}, 이메일: {}",
- *     PorestMask.name(user.getName()),
- *     PorestMask.email(user.getEmail()));
+ * // 주민등록번호 마스킹
+ * String masked = MaskUtils.ssn("900101-1234567");
+ * // 결과: "900101-1******"
+ *
+ * // 카드번호 마스킹
+ * String masked = MaskUtils.cardNumber("1234-5678-9012-3456");
+ * // 결과: "1234-****-****-3456"
  * }</pre>
+ *
+ * <h3>로깅 활용 예시</h3>
+ * <pre>{@code
+ * log.info("사용자 정보 조회 - 이름: {}, 이메일: {}, IP: {}",
+ *     MaskUtils.name(user.getName()),
+ *     MaskUtils.email(user.getEmail()),
+ *     MaskUtils.ip(clientIp));
+ * }</pre>
+ *
+ * <h3>지원 마스킹 유형</h3>
+ * <table border="1">
+ *   <tr><th>유형</th><th>메서드</th><th>보존 범위</th></tr>
+ *   <tr><td>이메일</td><td>email()</td><td>앞 3자 + 도메인</td></tr>
+ *   <tr><td>전화번호</td><td>phone()</td><td>앞 3자리 + 뒤 4자리</td></tr>
+ *   <tr><td>이름</td><td>name()</td><td>첫 글자 + 마지막 글자</td></tr>
+ *   <tr><td>카드번호</td><td>cardNumber()</td><td>앞 4자리 + 뒤 4자리</td></tr>
+ *   <tr><td>주민번호</td><td>ssn()</td><td>생년월일 + 성별코드</td></tr>
+ *   <tr><td>계좌번호</td><td>accountNumber()</td><td>앞 3자리 + 뒤 4자리</td></tr>
+ *   <tr><td>주소</td><td>address()</td><td>시/도/구 까지</td></tr>
+ *   <tr><td>IP 주소</td><td>ip()</td><td>앞 3옥텟</td></tr>
+ * </table>
  *
  * @author porest
  */
-public final class PorestMask {
+public final class MaskUtils {
 
     private static final String MASK_CHAR = "*";
 
-    private PorestMask() {
+    private MaskUtils() {
         // 유틸리티 클래스 인스턴스화 방지
     }
 
@@ -47,6 +71,8 @@ public final class PorestMask {
      *   <li>"hong@example.com" → "hon***@example.com"</li>
      *   <li>"ab@example.com" → "ab***@example.com"</li>
      *   <li>"a@example.com" → "a***@example.com"</li>
+     *   <li>null → null</li>
+     *   <li>"invalid" → "invalid" (@ 없으면 원본 반환)</li>
      * </ul>
      *
      * @param email 원본 이메일
@@ -71,17 +97,20 @@ public final class PorestMask {
     /**
      * 전화번호 마스킹
      * <p>
-     * 전화번호의 중간 4자리를 마스킹합니다.
+     * 전화번호의 중간 부분을 마스킹합니다.
+     * 하이픈 유무에 관계없이 처리합니다.
      *
      * <h4>예시</h4>
      * <ul>
      *   <li>"010-1234-5678" → "010-****-5678"</li>
      *   <li>"02-123-4567" → "02-***-4567"</li>
      *   <li>"01012345678" → "010****5678"</li>
+     *   <li>null → null</li>
+     *   <li>"1234567" → "1234567" (8자 미만은 원본 반환)</li>
      * </ul>
      *
      * @param phone 원본 전화번호
-     * @return 마스킹된 전화번호, null이면 null 반환
+     * @return 마스킹된 전화번호, null이거나 8자 미만이면 원본 반환
      */
     public static String phone(String phone) {
         if (phone == null || phone.length() < 8) {
@@ -118,18 +147,20 @@ public final class PorestMask {
      * 이름 마스킹
      * <p>
      * 이름의 중간 글자를 마스킹합니다.
+     * 첫 글자와 마지막 글자만 보존합니다.
      *
      * <h4>예시</h4>
      * <ul>
      *   <li>"홍길동" → "홍*동"</li>
      *   <li>"김철수" → "김*수"</li>
-     *   <li>"이" → "이" (1글자는 마스킹 안함)</li>
-     *   <li>"이순신" → "이*신"</li>
      *   <li>"남궁민수" → "남**수"</li>
+     *   <li>"이" → "이" (1글자는 마스킹 안함)</li>
+     *   <li>"이순" → "이*"</li>
+     *   <li>null → null</li>
      * </ul>
      *
      * @param name 원본 이름
-     * @return 마스킹된 이름, null이면 null 반환
+     * @return 마스킹된 이름, null이거나 1글자면 원본 반환
      */
     public static String name(String name) {
         if (name == null || name.length() <= 1) {
@@ -156,10 +187,12 @@ public final class PorestMask {
      * <ul>
      *   <li>"1234-5678-9012-3456" → "1234-****-****-3456"</li>
      *   <li>"1234567890123456" → "1234********3456"</li>
+     *   <li>null → null</li>
+     *   <li>"12345678" → "12345678" (12자 미만은 원본 반환)</li>
      * </ul>
      *
      * @param cardNumber 원본 카드번호
-     * @return 마스킹된 카드번호, null이면 null 반환
+     * @return 마스킹된 카드번호, null이거나 12자 미만이면 원본 반환
      */
     public static String cardNumber(String cardNumber) {
         if (cardNumber == null) {
@@ -191,16 +224,18 @@ public final class PorestMask {
      * 주민등록번호 마스킹
      * <p>
      * 주민등록번호의 뒷자리를 마스킹합니다.
-     * 생년월일과 성별 코드(첫 1자리)만 보존합니다.
+     * 생년월일(앞 6자리)과 성별 코드(뒷자리 첫 1자리)만 보존합니다.
      *
      * <h4>예시</h4>
      * <ul>
      *   <li>"900101-1234567" → "900101-1******"</li>
      *   <li>"9001011234567" → "900101-1******"</li>
+     *   <li>null → null</li>
+     *   <li>"90010112345" → "90010112345" (13자리 아니면 원본 반환)</li>
      * </ul>
      *
      * @param ssn 원본 주민등록번호
-     * @return 마스킹된 주민등록번호, null이면 null 반환
+     * @return 마스킹된 주민등록번호, null이거나 형식이 맞지 않으면 원본 반환
      */
     public static String ssn(String ssn) {
         if (ssn == null) {
@@ -225,12 +260,14 @@ public final class PorestMask {
      *
      * <h4>예시</h4>
      * <ul>
-     *   <li>"110-123-456789" → "110-***-**6789"</li>
-     *   <li>"1101234567890" → "110*******890"</li>
+     *   <li>"110-123-456789" → "110*******6789"</li>
+     *   <li>"1101234567890" → "110*******7890"</li>
+     *   <li>null → null</li>
+     *   <li>"1234567" → "1234567" (8자 미만은 원본 반환)</li>
      * </ul>
      *
      * @param accountNumber 원본 계좌번호
-     * @return 마스킹된 계좌번호, null이면 null 반환
+     * @return 마스킹된 계좌번호, null이거나 8자 미만이면 원본 반환
      */
     public static String accountNumber(String accountNumber) {
         if (accountNumber == null) {
@@ -260,12 +297,14 @@ public final class PorestMask {
      *
      * <h4>예시</h4>
      * <ul>
-     *   <li>"서울시 강남구 역삼동 123-45" → "서울시 강남구 *****"</li>
+     *   <li>"서울시 강남구 역삼동 123-45" → "서울시 강남구 역삼동 *****"</li>
      *   <li>"경기도 성남시 분당구 정자동" → "경기도 성남시 분당구 ***"</li>
+     *   <li>null → null</li>
+     *   <li>"서울시" → "서울시" (2단어 이하면 원본 반환)</li>
      * </ul>
      *
      * @param address 원본 주소
-     * @return 마스킹된 주소, null이면 null 반환
+     * @return 마스킹된 주소, null이거나 공백이면 원본 반환
      */
     public static String address(String address) {
         if (address == null || address.isBlank()) {
@@ -292,20 +331,55 @@ public final class PorestMask {
     }
 
     /**
+     * IP 주소 마스킹
+     * <p>
+     * IP 주소의 마지막 옥텟을 마스킹합니다.
+     * 네트워크 대역은 보존하고 호스트 부분만 숨깁니다.
+     *
+     * <h4>예시</h4>
+     * <ul>
+     *   <li>"192.168.1.100" → "192.168.1.***"</li>
+     *   <li>"10.0.0.1" → "10.0.0.*"</li>
+     *   <li>null → null</li>
+     *   <li>"invalid" → "invalid" (. 없으면 원본 반환)</li>
+     * </ul>
+     *
+     * @param ip 원본 IP 주소
+     * @return 마스킹된 IP 주소, null이거나 유효하지 않으면 원본 반환
+     */
+    public static String ip(String ip) {
+        if (ip == null || !ip.contains(".")) {
+            return ip;
+        }
+
+        int lastDot = ip.lastIndexOf(".");
+        if (lastDot < 0) {
+            return ip;
+        }
+
+        String lastOctet = ip.substring(lastDot + 1);
+        return ip.substring(0, lastDot + 1) + MASK_CHAR.repeat(lastOctet.length());
+    }
+
+    /**
      * 커스텀 마스킹
      * <p>
      * 지정된 위치부터 지정된 길이만큼 마스킹합니다.
+     * 다른 마스킹 메서드로 처리할 수 없는 경우 사용합니다.
      *
      * <h4>예시</h4>
      * <pre>{@code
-     * PorestMask.custom("ABCDEFGH", 2, 4);
+     * MaskUtils.custom("ABCDEFGH", 2, 4);
      * // 결과: "AB****GH"
+     *
+     * MaskUtils.custom("LICENSE-12345", 8, 5);
+     * // 결과: "LICENSE-*****"
      * }</pre>
      *
      * @param value      원본 문자열
-     * @param startIndex 마스킹 시작 위치 (0부터)
-     * @param length     마스킹할 길이
-     * @return 마스킹된 문자열
+     * @param startIndex 마스킹 시작 위치 (0부터 시작)
+     * @param length     마스킹할 문자 개수
+     * @return 마스킹된 문자열, null이거나 범위 초과 시 원본 반환
      */
     public static String custom(String value, int startIndex, int length) {
         if (value == null || value.isEmpty()) {
@@ -321,33 +395,5 @@ public final class PorestMask {
         return value.substring(0, startIndex) +
                 MASK_CHAR.repeat(endIndex - startIndex) +
                 value.substring(endIndex);
-    }
-
-    /**
-     * IP 주소 마스킹
-     * <p>
-     * IP 주소의 마지막 옥텟을 마스킹합니다.
-     *
-     * <h4>예시</h4>
-     * <ul>
-     *   <li>"192.168.1.100" → "192.168.1.***"</li>
-     *   <li>"10.0.0.1" → "10.0.0.*"</li>
-     * </ul>
-     *
-     * @param ip 원본 IP 주소
-     * @return 마스킹된 IP 주소, null이면 null 반환
-     */
-    public static String ip(String ip) {
-        if (ip == null || !ip.contains(".")) {
-            return ip;
-        }
-
-        int lastDot = ip.lastIndexOf(".");
-        if (lastDot < 0) {
-            return ip;
-        }
-
-        String lastOctet = ip.substring(lastDot + 1);
-        return ip.substring(0, lastDot + 1) + MASK_CHAR.repeat(lastOctet.length());
     }
 }
